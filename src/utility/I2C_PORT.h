@@ -24,6 +24,7 @@ class I2C_PORT {
     uint8_t read8Bit(uint8_t address, uint8_t subAddress);
     uint16_t read12Bit(uint8_t subAddress);
     uint16_t read13Bit(uint8_t subAddress);
+    uint16_t read14Bit(uint8_t subAddress);
     uint16_t read16Bit(uint8_t subAddress);
     uint16_t read16Bit_lowFirst(uint8_t subAddress);
     uint32_t read24Bit(uint8_t subAddress);

@@ -60,14 +60,27 @@ class AXP2101 : public I2C_PORT {
 
     /* Init */
     bool begin(TwoWire* wire = &Wire1);
+    
+    /* help functions */
+    bool _getRegisterBit(uint8_t subaddress, int bit);
+    void _setRegisterBit(uint8_t subaddress, int bit);
     /* Power input state */
-    bool isACINExist();
-    bool isACINAvl();
-    bool isVBUSExist();
-    bool isVBUSAvl();
+    // bool isACINExist();
+    // bool isACINAvl();
+
+    bool isVBUSGood();
+    bool getBatFetState();
+    bool isBatConnect();
     bool getBatCurrentDir();
+
     bool isAXP173OverTemp();
+
     bool isCharging();
+    bool isDischarging();
+    bool isStandby();
+    bool isPowerOn();
+    bool isVBUSIn();
+
     bool isBatExist();
     bool isChargeCsmaller();
     /* Power output control */
@@ -79,8 +92,15 @@ class AXP2101 : public I2C_PORT {
     void setChargeEnable(bool state);
     void setChargeCurrent(CHARGE_CURRENT current);
     /* ADC control */
-    void setADCEnable(ADC_CHANNEL channel, bool state);  //
-    void setAllADC(bool state);                          //
+
+    // void setADCEnable(ADC_CHANNEL channel, bool state);  //
+    void setAllADC(bool state);
+
+#define XPOWERS_AXP2101_ADC_CHANNEL_CTRL                 (0x30)
+    void enableVbusVoltageMeasure();
+    void enableBattVoltageMeasure();
+    void enableSystemVoltageMeasure();
+    void enableTemperatureMeasure();
 
     /* Coulometer control */
     void setCoulometer(COULOMETER_CTRL option, bool state);
@@ -89,14 +109,30 @@ class AXP2101 : public I2C_PORT {
     uint32_t getCoulometerDischargeData();
     float getCoulometerData();
     /* BAT data */
-    float getBatVoltage();
+    // float getBatVoltage();
+
+#define XPOWERS_AXP2101_ADC_DATA_RELUST6                 (0x3A)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST7                 (0x3B)
+    uint16_t getSystemVoltage();
+
+#define XPOWERS_AXP2101_ADC_DATA_RELUST0                 (0x34)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST1                 (0x35)
+    uint16_t getBatVoltage();
     float getBatCurrent();
     float getBatLevel();
     float getBatPower();
     /* VBUS data */
-    float getVBUSVoltage();
+    // float getVBUSVoltage();
+#define XPOWERS_AXP2101_ADC_DATA_RELUST4                 (0x38)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST5                 (0x39)
+    uint16_t getVBUSVoltage();
     float getVBUSCurrent();
+
     /* Temperature data */
+#define XPOWERS_AXP2101_CONVERSION(raw)                 (22.0 + (7274 - raw) / 20.0)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST8                 (0x3C)
+#define XPOWERS_AXP2101_ADC_DATA_RELUST9                 (0x3D)
+    float getTemperature();
     float getAXP173Temp();
     float getTSTemp();
 

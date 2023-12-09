@@ -25,20 +25,41 @@ bool AXP2101::begin(TwoWire* wire) {
     init(wire, AXP2101_ADDR, 12, 11);
     return checkDevAvl();
 }
-bool AXP2101::isACINExist() {
-    return (read8Bit(0x00) & 0B10000000) ? true : false;
+
+// XXX: doesn't map to used values
+// bool AXP2101::isACINExist() {
+//     return (read8Bit(0x00) & 0B10000000) ? true : false;
+// }
+
+// XXX: doesn't map to used values
+// bool AXP2101::isACINAvl() {
+//     return (read8Bit(0x00) & 0B01000000) ? true : false;
+// }
+
+bool AXP2101::_getRegisterBit(uint8_t subaddress, int bit) {
+    return read8Bit(subaddress) & (1 << bit);
+}
+void AXP2101::_setRegisterBit(uint8_t subaddress, int bit) {
+    uint8_t buff = read8Bit(subaddress);
+    buff |= (1 << bit);
+    write1Byte(subaddress, buff);
 }
 
-bool AXP2101::isACINAvl() {
-    return (read8Bit(0x00) & 0B01000000) ? true : false;
+bool AXP2101::isVBUSGood() {
+    return _getRegisterBit(0x00, 5);
+    // return (read8Bit(0x00) & 0B00100000) ? true : false;
 }
 
-bool AXP2101::isVBUSExist() {
-    return (read8Bit(0x00) & 0B00100000) ? true : false;
+bool AXP2101::getBatFetState() {
+    return _getRegisterBit(0x00, 4);
+    // return (read8Bit(0x00) & 0B00010000) ? true : false;
+}
+bool AXP2101::isBatConnect() {
+    return _getRegisterBit(0x00, 3);
 }
 
-bool AXP2101::isVBUSAvl() {
-    return (read8Bit(0x00) & 0B00010000) ? true : false;
+bool AXP2101::isVBUSIn() {
+    return _getRegisterBit(0x01, 3) == 0 && isVBUSGood();
 }
 
 /**
@@ -48,10 +69,13 @@ bool AXP2101::isVBUSAvl() {
  * @return false Bat discharging
  */
 bool AXP2101::getBatCurrentDir() {
-    return (read8Bit(0x00) & 0B00000100) ? true : false;
+    return _getRegisterBit(0x00, 2);
+    // return (read8Bit(0x00) & 0B00000100) ? true : false;
 }
 
+// XXX: This doesn't map to working register
 bool AXP2101::isAXP173OverTemp() {
+    return _getRegisterBit(0x01, 7);
     return (read8Bit(0x01) & 0B10000000) ? true : false;
 }
 
@@ -62,7 +86,17 @@ bool AXP2101::isAXP173OverTemp() {
  * @return false Charge finished or not charging
  */
 bool AXP2101::isCharging() {
-    return (read8Bit(0x01) & 0B01000000) ? true : false;
+    return (read8Bit(0x01) >> 5) == 0x01;
+}
+bool AXP2101::isDischarging() {
+    return (read8Bit(0x01) >> 5) == 0x02;
+}
+bool AXP2101::isStandby() {
+    return (read8Bit(0x01) >> 5) == 0x00;
+}
+
+bool AXP2101::isPowerOn() {
+    return _getRegisterBit(0x01, 4);
 }
 
 bool AXP2101::isBatExist() {
@@ -172,10 +206,23 @@ void AXP2101::setChargeCurrent(CHARGE_CURRENT current) {
  * @param channel ADC channel
  * @param state true:Enable, false:Disable
  */
-void AXP2101::setADCEnable(ADC_CHANNEL channel, bool state) {
-    uint8_t buff = read8Bit(0x82);
-    buff         = state ? (buff | (1U << channel)) : (buff & ~(1U << channel));
-    write1Byte(0x82, buff);
+// void AXP2101::setADCEnable(ADC_CHANNEL channel, bool state) {
+//     uint8_t buff = read8Bit(0x82);
+//     buff         = state ? (buff | (1U << channel)) : (buff & ~(1U << channel));
+//     write1Byte(0x82, buff);
+// }
+
+void AXP2101::enableTemperatureMeasure() {
+    _setRegisterBit(XPOWERS_AXP2101_ADC_CHANNEL_CTRL, 4);
+}
+void AXP2101::enableSystemVoltageMeasure() {
+    _setRegisterBit(XPOWERS_AXP2101_ADC_CHANNEL_CTRL, 3);
+}
+void AXP2101::enableVbusVoltageMeasure() {
+    _setRegisterBit(XPOWERS_AXP2101_ADC_CHANNEL_CTRL, 2);
+}
+void AXP2101::enableBattVoltageMeasure() {
+    _setRegisterBit(XPOWERS_AXP2101_ADC_CHANNEL_CTRL, 0);
 }
 
 void AXP2101::setCoulometer(COULOMETER_CTRL option, bool state) {
@@ -199,10 +246,18 @@ float AXP2101::getCoulometerData() {
     return 65536 * 0.5 * (int32_t)(coin - coout) / 3600.0 / 25.0;
 }
 
-float AXP2101::getBatVoltage() {
-    float ADCLSB = 1.1 / 1000.0;
-    return read12Bit(0x78) * ADCLSB;
+// float AXP2101::getBatVoltage() {
+//     float ADCLSB = 1.1 / 1000.0;
+//     return read12Bit(0x78) * ADCLSB;
+// }
+uint16_t AXP2101::getBatVoltage() {
+    if (!isBatConnect()) {
+        return 0;
+    }
+    uint16_t reg = read13Bit(XPOWERS_AXP2101_ADC_DATA_RELUST0);
+    return reg;
 }
+
 
 float AXP2101::getBatCurrent() {
     float ADCLSB        = 0.5;
@@ -225,10 +280,22 @@ float AXP2101::getBatPower() {
     return VoltageLSB * CurrentLCS * ReData / 1000.0;
 }
 
-float AXP2101::getVBUSVoltage() {
-    float ADCLSB    = 1.7 / 1000.0;
-    uint16_t ReData = read12Bit(0x5A);
-    return ReData * ADCLSB;
+// float AXP2101::getVBUSVoltage() {
+//     float ADCLSB    = 1.7 / 1000.0;
+//     uint16_t ReData = read12Bit(0x5A);
+//     return ReData * ADCLSB;
+// }
+uint16_t AXP2101::getVBUSVoltage() {
+    if (!isVBUSIn()) {
+        return 0;
+    }
+    uint16_t reg = read14Bit(XPOWERS_AXP2101_ADC_DATA_RELUST4);
+    return reg;
+}
+
+uint16_t AXP2101::getSystemVoltage() {
+    uint16_t reg = read14Bit(XPOWERS_AXP2101_ADC_DATA_RELUST6);
+    return reg;
 }
 
 float AXP2101::getVBUSCurrent() {
@@ -237,11 +304,16 @@ float AXP2101::getVBUSCurrent() {
     return ReData * ADCLSB;
 }
 
-float AXP2101::getAXP173Temp() {
-    float ADCLSB             = 0.1;
-    const float OFFSET_DEG_C = -144.7;
-    uint16_t ReData          = read12Bit(0x5E);
-    return OFFSET_DEG_C + ReData * ADCLSB;
+// float AXP2101::getAXP173Temp() {
+//     float ADCLSB             = 0.1;
+//     const float OFFSET_DEG_C = -144.7;
+//     uint16_t ReData          = read12Bit(0x5E);
+//     return OFFSET_DEG_C + ReData * ADCLSB;
+// }
+
+float AXP2101::getTemperature() {
+    uint16_t raw = read14Bit(XPOWERS_AXP2101_ADC_DATA_RELUST8);
+    return XPOWERS_AXP2101_CONVERSION(raw);
 }
 
 float AXP2101::getTSTemp() {

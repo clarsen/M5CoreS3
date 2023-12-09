@@ -49,9 +49,15 @@ uint16_t I2C_PORT::read12Bit(uint8_t subAddress) {
 }
 
 uint16_t I2C_PORT::read13Bit(uint8_t subAddress) {
-    uint8_t buff[2];
+    uint8_t buff[2];   // 5 bits of high reg, 8 bits of low reg
     readBuff(subAddress, 2, buff);
-    return (buff[0] << 5) + buff[1];
+    return ((buff[0] &0x1f) << 5) + buff[1];
+}
+
+uint16_t I2C_PORT::read14Bit(uint8_t subAddress) {
+    uint8_t buff[2];  // 6 bits of high reg, 8 bits of low reg
+    readBuff(subAddress, 2, buff);
+    return ((buff[0] & 0x3f) << 8) | buff[1];
 }
 
 uint16_t I2C_PORT::read16Bit(uint8_t subAddress) {
@@ -75,7 +81,10 @@ uint32_t I2C_PORT::read32Bit(uint8_t subAddress) {
 void I2C_PORT::readBuff(uint8_t subAddress, int size, uint8_t buff[]) {
     _wire->beginTransmission(_address);
     _wire->write(subAddress);
-    _wire->endTransmission();
+    int err = _wire->endTransmission();
+    if (err != 0) {
+        log_e("I2C_PORT::readBuff Wire::endTransmission error: %d\n", err);
+    }
     _wire->requestFrom(_address, (size_t)size);
     for (int i = 0; i < size; i++) {
         buff[i] = _wire->read();
